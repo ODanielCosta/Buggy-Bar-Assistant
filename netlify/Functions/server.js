@@ -80,19 +80,20 @@ app.get('/api/sales', async (req, res) => {
     }
 });
 
-app.post('/api/stock', async (req, res) => { // New POST endpoint for stock
+app.post('/api/sales', async (req, res) => {
     try {
         const db = client.db('BuggyBar');
-        const stockCollection = db.collection('Stock');
-        const stockData = req.body;
-        await stockCollection.deleteMany({}); // Delete all existing stock data
-        const result = await stockCollection.insertMany(stockData); // Insert the new stock data
-        res.status(201).json({ message: 'Stock updated successfully', insertedIds: result.insertedIds });
+        const salesCollection = db.collection('Sales');
+        const purchaseData = req.body;
+        purchaseData.date = purchaseData.date.split('T')[0]; // Remove the time from the date
+        const result = await salesCollection.insertOne(purchaseData);
+        res.status(201).json({ message: 'Sale recorded successfully', insertedId: result.insertedId });
     } catch (error) {
-        console.error('Error updating stock:', error);
-        res.status(500).json({ error: 'Failed to update stock' });
+        console.error('Error recording sale:', error);
+        res.status(500).json({ error: 'Failed to record sale' });
     }
 });
+
 
 app.get('/api/stock', async (req, res) => { // New GET endpoint for stock
     try {
