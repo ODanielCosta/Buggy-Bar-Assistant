@@ -1,5 +1,5 @@
 [build]
-  functions = "netlify/functions"
+  functions = "netlify/Functions"
   publish = "." # Or the directory where your static files are (e.g., "public")
 
 [[redirects]]
