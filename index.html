@@ -194,22 +194,22 @@
 
         async function fetchStock() {
             try {
-                const response = await fetch('/api/stock');
-                if (response.ok) {
-                    const stock = await response.json();
-                    stock.forEach(stockItem => {
-                        const entry = productEntries.find(e => e.name === stockItem.name);
-                        if (entry) {
-                            entry.initialQuantity = stockItem.initialQuantity;
-                            entry.originalQuantity = stockItem.originalQuantity;
-                            updateStockDisplay(entry.id);
-                        }
-                    });
-                } else {
-                    console.error('Failed to fetch stock:', response.statusText);
+                const response = await fetch('/api/stock'); // Correct! Relative URL
+                if (!response.ok) {
+                    throw new Error('Failed to fetch stock');
                 }
+                const data = await response.json();
+                data.forEach(item => {
+                    const productEntry = productEntries.find(entry => entry.name === item.name);
+                    if (productEntry) {
+                        productEntry.initialQuantity = item.initialQuantity;
+                        productEntry.originalQuantity = item.originalQuantity;
+                        updateStockDisplay(productEntry.id);
+                    }
+                });
+                updateSummary();
             } catch (error) {
-                console.error('Error fetching stock:', error);
+                console.error('Failed to fetch stock:', error);
             }
         }
 
@@ -338,6 +338,8 @@
                 if (response.ok) {
                     const data = await response.json();
                     console.log('Sale recorded:', data);
+                    // Add the purchase to the purchaseRecords array
+                    purchaseRecords.push(purchaseData);
                     // Update stock based on sales
                     productEntries.forEach(entry => {
                         entry.soldNonMember = 0;
@@ -345,7 +347,7 @@
                         updateStockDisplay(entry.id);
                     });
                     // Fetch the updated sales
-                    await fetchSales();
+                    await fetchSales(formattedDate);
                     updateCartDisplay();
                     resetChangeElements();
                     updateSummary();
@@ -359,21 +361,18 @@
         }
 
         
-        async function fetchSales() {
-            const now = new Date();
-            const formattedDate = now.toISOString().split('T')[0]; // Get YYYY-MM-DD
+        async function fetchSales(date) {
             try {
-                const response = await fetch(`/api/sales?date=${formattedDate}`); // Add the date to the URL
-                if (response.ok) {
-                    const sales = await response.json();
-                    purchaseRecords = sales;
-                    displayPurchaseRecords();
-                    updateSummary(); // Call updateSummary() here
-                } else {
-                    console.error('Failed to fetch sales:', response.statusText);
+                const response = await fetch(`/api/sales?date=${date}`); // Correct! Relative URL
+                if (!response.ok) {
+                    throw new Error('Failed to fetch sales');
                 }
+                const data = await response.json();
+                purchaseRecords = data;
+                displayPurchaseRecords();
+                updateSummary();
             } catch (error) {
-                console.error('Error fetching sales:', error);
+                console.error('Failed to fetch sales:', error);
             }
         }
 
@@ -530,8 +529,10 @@
         window.onload = () => {
             initializeProductEntries();
             fetchStock(); // Fetch stock on load
-            fetchSales(); // Fetch sales on load
+            const today = new Date().toISOString().split('T')[0];
+            fetchSales(today); // Fetch sales on load
         };
+
     </script>
 </body>
 </html>
