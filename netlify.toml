@@ -1,8 +1,8 @@
 [build]
-  functions = "netlify/Functions"
+  functions = "netlify/functions"
   publish = "." # Or the directory where your static files are (e.g., "public")
 
 [[redirects]]
   from = "/api/*"
-  to = "/.netlify/Functions/:splat"
+  to = "/.netlify/functions/:splat"
   status = 200
