@@ -129,6 +129,7 @@
                 `;
                 document.getElementById(product.group).appendChild(entryDiv);
                 productEntries.push({
+                    _id: null,
                     id: index,
                     name: product.name,
                     price: product.price,
@@ -176,6 +177,7 @@
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(productEntries.map(entry => ({
+                        _id: entry._id,
                         name: entry.name,
                         initialQuantity: entry.initialQuantity,
                         originalQuantity: entry.originalQuantity
@@ -202,6 +204,7 @@
                 data.forEach(item => {
                     const productEntry = productEntries.find(entry => entry.name === item.name);
                     if (productEntry) {
+                        productEntry._id = item._id;
                         productEntry.initialQuantity = item.initialQuantity;
                         productEntry.originalQuantity = item.originalQuantity;
                         updateStockDisplay(productEntry.id);
@@ -212,6 +215,7 @@
                 console.error('Failed to fetch stock:', error);
             }
         }
+
 
         /*function addInitialQuantity(entryId) {
             const quantity = parseInt(document.getElementById(`product-quantity-${entryId}`).value);
