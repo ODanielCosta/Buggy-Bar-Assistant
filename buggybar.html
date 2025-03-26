@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BUGGY BAR</title>
+    <style>
+        .product-entry {
+            margin-bottom: 10px;
+        }
+        .product-entry input, .product-entry button {
+            margin-right: 5px;
+        }
+        .purchase-record {
+            margin-top: 20px;
+        }
+        .purchase-record div {
+            margin-bottom: 5px;
+        }
+        .cart-entry {
+            margin-bottom: 10px;
+        }
+        .purchase-details {
+            display: flex;
+            flex-direction: column;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <main>
+        <div>
+            <h3>Loja Buggy Bar</h3>
+            <button onclick="toggleGroup('bebidas')">Bebidas</button>
+            <div id="bebidas" class="hidden">
+                <!-- Bebidas entries will be added here -->
+            </div>
+        </div>
+        <div>
+            <button onclick="toggleGroup('snacks')">Snacks</button>
+            <div id="snacks" class="hidden">
+                <!-- Snacks entries will be added here -->
+            </div>
+        </div>
+        <div>
+            <button onclick="toggleGroup('sandes')">Sandes</button>
+            <div id="sandes" class="hidden">
+                <!-- Sandes entries will be added here -->
+            </div>
+        </div>
+
+        <div id="cart">
+            <h3>Carrinho</h3>
+            <div id="cart-entries">
+                <!-- Cart entries will be added here -->
+            </div>
+            <div id="current-summary">
+                <!-- Current summary will be displayed here -->
+            </div>
+            <input type="number" id="payment-amount" placeholder="Valor pago">
+            <button onclick="calculateChange()">Calcular Troco</button>
+            <div id="change-amount">
+                <!-- Change amount will be displayed here -->
+            </div>
+            <button onclick="clearCart()">Limpar Carrinho</button>
+        </div>
+
+        <button onclick="savePurchase()">Guardar Compra</button>
+        <!--<button onclick="clearAllPurchases()">Limpar Todas as Compras</button>-->
+        
+        <h3>Vendas do Dia</h3>
+        <div id="purchase-records" class="purchase-record">
+            <!-- Purchase records will be displayed here -->
+        </div>
+
+        <h3>Totais</h3>
+        <div id="summary">
+            <!-- Summary of sales will be displayed here -->
+        </div>
+    </main>
+
+    <script>
+        function toggleGroup(groupId) {
+            const groupDiv = document.getElementById(groupId);
+            groupDiv.classList.toggle('hidden');
+        }
+
+        const products = [
+                    { name: 'Água', price: 1.70, memberPrice: 1.50, group: 'bebidas' },
+                    { name: 'Cerveja', price: 4.20, memberPrice: 3.60, group: 'bebidas' },
+                    { name: 'Somersby', price: 5.00, memberPrice: 4.25, group: 'bebidas' },
+                    { name: 'Coca Cola', price: 3.70, memberPrice: 3.15, group: 'bebidas' },
+                    { name: 'Coca Cola 0', price: 3.70, memberPrice: 3.15, group: 'bebidas' },
+                    { name: 'Fanta', price: 3.70, memberPrice: 3.15, group: 'bebidas' },
+                    { name: 'Powerade', price: 6.50, memberPrice: 5.60, group: 'bebidas' },
+                    { name: 'Café', price: 2.00, memberPrice: 1.50, group: 'bebidas' },
+                    { name: 'KIT KAT', price: 2.30, memberPrice: 2.00, group: 'snacks' },
+                    { name: 'SNICKERS', price: 2.30, memberPrice: 2.00, group: 'snacks' },
+                    { name: 'TWIX', price: 2.30, memberPrice: 2.00, group: 'snacks' },
+                    { name: 'Pringles', price: 4.00, memberPrice: 3.40, group: 'snacks' },
+                    { name: 'Mista', price: 7.00, memberPrice: 6.00, group: 'sandes' },
+                    { name: 'Atum', price: 8.00, memberPrice: 6.80, group: 'sandes' },
+                    { name: 'Bacon & Ovo', price: 8.00, memberPrice: 6.80, group: 'sandes' },
+                    { name: 'Frango', price: 8.00, memberPrice: 6.80, group: 'sandes' }
+                ];
+
+
+        let productEntries = [];
+        let purchaseRecords = [];
+
+        function initializeProductEntries() {
+            products.forEach((product, index) => {
+                const entryDiv = document.createElement('div');
+                entryDiv.className = 'product-entry';
+                entryDiv.id = `product-entry-${index}`;
+                entryDiv.innerHTML = `
+                    <span>${product.name}</span>
+                    <button onclick="addNonMemberSale(${index})">Preço: €${product.price.toFixed(2)}</button>
+                    <button onclick="addMemberSale(${index})">Preço Sócio: €${product.memberPrice.toFixed(2)}</button>
+                    <button onclick="toggleQuantityInput(${index})">Quantidade</button>
+                    <div id="quantity-input-${index}" class="hidden">
+                        <input type="number" placeholder="Quantidade inicial" id="product-quantity-${index}">
+                        <button onclick="addInitialQuantity(${index})">Adicionar Quantidade</button>
+                        <button onclick="removeInitialQuantity(${index})">Remover Quantidade</button>
+                    </div>
+                    <span id="current-stock-${index}">Stock: 0</span>
+                `;
+                document.getElementById(product.group).appendChild(entryDiv);
+                productEntries.push({
+                    id: index,
+                    name: product.name,
+                    price: product.price,
+                    memberPrice: product.memberPrice,
+                    initialQuantity: 0,
+                    soldNonMember: 0,
+                    soldMember: 0,
+                    originalQuantity: 0
+                });
+            });
+        }
+
+        function toggleQuantityInput(entryId) {
+            const quantityInputDiv = document.getElementById(`quantity-input-${entryId}`);
+            quantityInputDiv.classList.toggle('hidden');
+        }
+
+        function updateStockDisplay(entryId) {
+            const entry = productEntries[entryId];
+            const stockDisplay = entry.initialQuantity === entry.originalQuantity || entry.originalQuantity === 0
+                ? `Stock: ${entry.initialQuantity}`
+                : `Stock: ${entry.originalQuantity} + ${entry.initialQuantity - entry.originalQuantity} = ${entry.initialQuantity}`;
+            document.getElementById(`current-stock-${entryId}`).innerText = stockDisplay;
+        }
+
+        function updateCartDisplay() {
+            const cartDiv = document.getElementById('cart-entries');
+            cartDiv.innerHTML = '';
+            productEntries.forEach(entry => {
+                if (entry.soldNonMember > 0 || entry.soldMember > 0) {
+                    const cartEntryDiv = document.createElement('div');
+                    cartEntryDiv.className = 'cart-entry';
+                    cartEntryDiv.innerText = `${entry.name}: ${entry.soldNonMember} (não sócio), ${entry.soldMember} (sócio)`;
+                    cartDiv.appendChild(cartEntryDiv);
+                }
+            });
+        }
+
+
+        async function saveStock() {
+            try {
+                const response = await fetch('http://localhost:3000/api/stock', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(productEntries.map(entry => ({
+                        name: entry.name,
+                        initialQuantity: entry.initialQuantity,
+                        originalQuantity: entry.originalQuantity
+                    })))
+                });
+
+                if (response.ok) {
+                    console.log('Stock saved successfully');
+                } else {
+                    console.error('Failed to save stock:', response.statusText);
+                }
+            } catch (error) {
+                console.error('Error saving stock:', error);
+            }
+        }
+
+        async function fetchStock() {
+            try {
+                const response = await fetch('http://localhost:3000/api/stock');
+                if (response.ok) {
+                    const stock = await response.json();
+                    stock.forEach(stockItem => {
+                        const entry = productEntries.find(e => e.name === stockItem.name);
+                        if (entry) {
+                            entry.initialQuantity = stockItem.initialQuantity;
+                            entry.originalQuantity = stockItem.originalQuantity;
+                            updateStockDisplay(entry.id);
+                        }
+                    });
+                } else {
+                    console.error('Failed to fetch stock:', response.statusText);
+                }
+            } catch (error) {
+                console.error('Error fetching stock:', error);
+            }
+        }
+
+        /*function addInitialQuantity(entryId) {
+            const quantity = parseInt(document.getElementById(`product-quantity-${entryId}`).value);
+            const entry = productEntries[entryId];
+            if (entry.initialQuantity === entry.originalQuantity) {
+                entry.originalQuantity = entry.initialQuantity;
+            }
+            entry.initialQuantity += quantity;
+            updateStockDisplay(entryId);
+            toggleQuantityInput(entryId);
+            updateSummary();
+        }*/
+
+        function addInitialQuantity(entryId) {
+            const quantityInput = document.getElementById(`product-quantity-${entryId}`);
+            const quantity = parseInt(quantityInput.value);
+            const entry = productEntries[entryId];
+
+            if (isNaN(quantity)) {
+                // Handle empty or invalid input
+                alert('Por favor, insira uma quantidade válida.');
+                quantityInput.value = ''; // Clear the input field
+                return; // Exit the function
+            }
+
+            if (entry.initialQuantity === entry.originalQuantity) {
+                entry.originalQuantity = entry.initialQuantity;
+            }
+            entry.initialQuantity += quantity;
+            updateStockDisplay(entryId);
+            toggleQuantityInput(entryId);
+            updateSummary();
+            saveStock(); // Save stock after updating
+        }
+
+        function removeInitialQuantity(entryId) {
+            const quantityInput = document.getElementById(`product-quantity-${entryId}`);
+            const quantity = parseInt(quantityInput.value);
+            const entry = productEntries[entryId];
+
+            if (isNaN(quantity)) {
+                // Handle empty or invalid input
+                alert('Por favor, insira uma quantidade válida.');
+                quantityInput.value = ''; // Clear the input field
+                return; // Exit the function
+            }
+
+            if (entry.initialQuantity - quantity < 0) {
+                alert('Não é possível remover mais stock do que o disponível.');
+                quantityInput.value = ''; // Clear the input field
+                return;
+            }
+
+            entry.initialQuantity -= quantity;
+            updateStockDisplay(entryId);
+            toggleQuantityInput(entryId);
+            updateSummary();
+            saveStock(); // Save stock after updating
+            quantityInput.value = ''; // Clear the input field
+        }
+
+        function addNonMemberSale(entryId) {
+            const entry = productEntries[entryId];
+            if (entry.initialQuantity > 0) {
+                entry.soldNonMember += 1;
+                entry.initialQuantity -= 1;
+                updateStockDisplay(entryId);
+                updateCartDisplay();
+                updateSummary();
+            } else {
+                alert('Sem stock disponível');
+            }
+        }
+
+        function addMemberSale(entryId) {
+            const entry = productEntries[entryId];
+            if (entry.initialQuantity > 0) {
+                entry.soldMember += 1;
+                entry.initialQuantity -= 1;
+                updateStockDisplay(entryId);
+                updateCartDisplay();
+                updateSummary();
+            } else {
+                alert('Sem stock disponível');
+            }
+        }
+
+        async function savePurchase() {
+            const purchase = productEntries.filter(entry => entry.soldNonMember > 0 || entry.soldMember > 0).map(entry => ({
+                name: entry.name,
+                soldNonMember: entry.soldNonMember,
+                soldMember: entry.soldMember
+            }));
+
+            if (purchase.length === 0) {
+                alert('Não há produtos no carrinho.');
+                return;
+            }
+
+            const now = new Date();
+            const totalAmount = purchase.reduce((total, product) => {
+                const entry = productEntries.find(e => e.name === product.name);
+                return total + (product.soldNonMember * entry.price) + (product.soldMember * entry.memberPrice);
+            }, 0);
+
+            const formattedDate = now.toISOString().split('T')[0]; // Get YYYY-MM-DD
+
+            const purchaseData = {
+                date: formattedDate, // Add the date
+                timestamp: now,
+                totalAmount: totalAmount,
+                products: purchase
+            };
+
+            try {
+                const response = await fetch('http://localhost:3000/api/sales', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(purchaseData)
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log('Sale recorded:', data);
+                    // Update stock based on sales
+                    productEntries.forEach(entry => {
+                        entry.soldNonMember = 0;
+                        entry.soldMember = 0;
+                        updateStockDisplay(entry.id);
+                    });
+                    // Fetch the updated sales
+                    await fetchSales();
+                    updateCartDisplay();
+                    resetChangeElements();
+                    updateSummary();
+                    saveStock(); // Save stock after purchase
+                } else {
+                    console.error('Failed to record sale:', response.statusText);
+                }
+            } catch (error) {
+                console.error('Error recording sale:', error);
+            }
+        }
+
+        
+        async function fetchSales() {
+            const now = new Date();
+            const formattedDate = now.toISOString().split('T')[0]; // Get YYYY-MM-DD
+            try {
+                const response = await fetch(`http://localhost:3000/api/sales?date=${formattedDate}`); // Add the date to the URL
+                if (response.ok) {
+                    const sales = await response.json();
+                    purchaseRecords = sales;
+                    displayPurchaseRecords();
+                    updateSummary(); // Call updateSummary() here
+                } else {
+                    console.error('Failed to fetch sales:', response.statusText);
+                }
+            } catch (error) {
+                console.error('Error fetching sales:', error);
+            }
+        }
+
+
+        
+        function displayPurchaseRecords() {
+            const recordsDiv = document.getElementById('purchase-records');
+            recordsDiv.innerHTML = '';
+            const today = new Date().toISOString().split('T')[0]; // Get today's date in YYYY-MM-DD format
+            purchaseRecords.forEach((purchase, index) => {
+                const formattedDate = new Date(purchase.timestamp).toLocaleString();
+                const purchaseDate = purchase.date; // Get the purchase date
+                const purchaseDetails = purchase.products.map(p => {
+                    return `${p.name} (não sócio: ${p.soldNonMember}, sócio: ${p.soldMember})`;
+                }).join('<br>');
+                const purchaseDiv = document.createElement('div');
+                if (purchaseDate === today) { // Check if the purchase date is today
+                    purchaseDiv.innerHTML = `
+                        Compra ${index + 1}: €${purchase.totalAmount.toFixed(2)}
+                        <button onclick="togglePurchaseDetails(${index})">Mais info</button>
+                        <div id="purchase-details-${index}" class="purchase-details hidden">${purchaseDetails}</div>
+                        <button onclick="removePurchase(${index})">Remover Compra</button>
+                    `;
+                } else {
+                    purchaseDiv.innerHTML = `
+                        Compra ${index + 1} - ${formattedDate}: €${purchase.totalAmount.toFixed(2)}
+                        <button onclick="togglePurchaseDetails(${index})">Mais info</button>
+                        <div id="purchase-details-${index}" class="purchase-details hidden">${purchaseDetails}</div>
+                        <button onclick="removePurchase(${index})">Remover Compra</button>
+                    `;
+                }
+                recordsDiv.appendChild(purchaseDiv);
+            });
+        }
+
+                
+
+        function resetChangeElements() {
+            document.getElementById('payment-amount').value = '';
+            document.getElementById('change-amount').innerText = '';
+        }
+
+        function clearCart() {
+            productEntries.forEach(entry => {
+                entry.initialQuantity += entry.soldNonMember + entry.soldMember;
+                entry.soldNonMember = 0;
+                entry.soldMember = 0;
+                updateStockDisplay(entry.id);
+            });
+            updateCartDisplay();
+            updateSummary();
+        }
+
+        function clearAllPurchases() {
+            purchaseRecords = [];
+            displayPurchaseRecords();
+            updateSummary();
+        }
+
+        
+        
+        
+        function togglePurchaseDetails(index) {
+            if (typeof index !== 'number') {
+                console.error('Invalid index type. Expected a number.');
+                return;
+            }
+
+            const detailsDiv = document.getElementById(`purchase-details-${index}`);
+            if (!detailsDiv) {
+                console.error(`Element with id purchase-details-${index} not found.`);
+                return;
+            }
+
+            detailsDiv.classList.toggle('hidden');
+        }
+
+    
+
+       /* function removePurchase(index) {
+            const purchase = purchaseRecords[index];
+            purchase.products.forEach(p => {
+                const entry = productEntries.find(e => e.name === p.name);
+                entry.initialQuantity += (p.soldNonMember + p.soldMember);
+                updateStockDisplay(entry.id);
+            });
+            purchaseRecords.splice(index, 1);
+            displayPurchaseRecords();
+            updateSummary();
+        }*/
+
+        async function removePurchase(index) {
+            const purchase = purchaseRecords[index];
+            const purchaseId = purchase._id; // Get the purchase ID
+
+            try {
+                const response = await fetch(`http://localhost:3000/api/sales/${purchaseId}`, { // Send DELETE request
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    console.log('Purchase deleted from database');
+                    // Update stock based on sales
+                    purchase.products.forEach(p => {
+                        const entry = productEntries.find(e => e.name === p.name);
+                        entry.initialQuantity += (p.soldNonMember + p.soldMember);
+                        updateStockDisplay(entry.id);
+                    });
+                    // Remove from purchaseRecords and update display
+                    purchaseRecords.splice(index, 1);
+                    displayPurchaseRecords();
+                    updateSummary();
+                } else {
+                    console.error('Failed to delete purchase:', response.statusText);
+                }
+            } catch (error) {
+                console.error('Error deleting purchase:', error);
+            }
+        }
+
+        function calculateChange() {
+            const paymentAmount = parseFloat(document.getElementById('payment-amount').value);
+            const currentRevenue = productEntries.reduce((total, entry) => {
+                return total + (entry.soldNonMember * entry.price) + (entry.soldMember * entry.memberPrice);
+            }, 0);
+            const change = paymentAmount - currentRevenue;
+            document.getElementById('change-amount').innerText = `Troco: €${change.toFixed(2)}`;
+        }
+
+        function updateSummary() {
+            const currentSummaryDiv = document.getElementById('current-summary');
+            const summaryDiv = document.getElementById('summary');
+            let totalSold = 0;
+            let totalRevenue = 0;
+            let totalPurchases = purchaseRecords.length;
+            let currentRevenue = 0;
+            productEntries.forEach(entry => {
+                totalSold += entry.soldNonMember + entry.soldMember;
+                currentRevenue += (entry.soldNonMember * entry.price) + (entry.soldMember * entry.memberPrice);
+            });
+            purchaseRecords.forEach(purchase => {
+                totalRevenue += purchase.totalAmount;
+            });
+            currentSummaryDiv.innerHTML = `
+                Total Vendido: ${totalSold} artigos<br>
+                Receita Atual: €${currentRevenue.toFixed(2)}
+            `;
+            summaryDiv.innerHTML = `
+                Total de Compras: ${totalPurchases}<br>
+                Receita Total: €${totalRevenue.toFixed(2)}
+            `;
+        }
+
+        window.onload = () => {
+            initializeProductEntries();
+            fetchStock(); // Fetch stock on load
+            fetchSales(); // Fetch sales on load
+        };
+    </script>
+</body>
+</html>
