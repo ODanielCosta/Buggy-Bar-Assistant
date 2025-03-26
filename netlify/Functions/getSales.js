@@ -1,4 +1,4 @@
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 
 exports.handler = async (event, context) => {
     console.log("Function getSales started");
@@ -26,9 +26,15 @@ exports.handler = async (event, context) => {
 
         const sales = await salesCollection.find({ date: currentDate }).toArray();
 
+        // Add _id to each sale
+        const salesWithId = sales.map(sale => ({
+            ...sale,
+            _id: sale._id.toString() // Convert ObjectId to string
+        }));
+
         return {
             statusCode: 200,
-            body: JSON.stringify(sales),
+            body: JSON.stringify(salesWithId),
         };
     } catch (error) {
         console.error('Error fetching sales:', error);
